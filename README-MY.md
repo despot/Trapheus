@@ -46,12 +46,18 @@ You need S3 setup:
 2. For more on sizing check https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Subnets.html#vpc-sizing-ipv4 According to https://docs.aws.amazon.com/quickstart/latest/vpc/architecture.html the private subnets should be double the size of the public subnet and the rest should be spare+private subnet with dedicated custom network ACL. Since we are not using the later two, create the private and public ones only:  
 VPC: 10.0.0.0/16  
 Since 3 AZs in Frankfurt (https://aws.amazon.com/about-aws/global-infrastructure/regions_az), the subnets you need to create are:    
-private in az1: 10.0.0.0/19
-private in az2: 10.0.32.0/19
-private in az3: 10.0.64.0/19
-public in az1: 10.0.128.0/20
-public in az2: 10.0.144.0/20
-public in az3: 10.0.160.0/20
+private in az1: Trapheus-Subnet-1-PR-az-euc1a, 10.0.0.0/19
+private in az2: Trapheus-Subnet-2-PR-az-euc1b 10.0.32.0/19
+private in az3: Trapheus-Subnet-3-PR-az-euc1c 10.0.64.0/19
+public in az1: Trapheus-Subnet-4-PU-az-euc1a 10.0.128.0/20
+public in az2: Trapheus-Subnet-5-PU-az-euc1b 10.0.144.0/20
+public in az3: Trapheus-Subnet-6-PU-az-euc1c 10.0.160.0/20
+NEW (trial to fix the connection problem):
+private in az1: Trapheus-Subnet-1-PR-az-euw1a, 10.0.0.0/19
+private in az2: Trapheus-Subnet-2-PR-az-euw1b 10.0.32.0/19
+private in az3: Trapheus-Subnet-3-PR-az-euw1c 10.0.64.0/19
+Private subnet ids (taken after creation) separated by comma: subnet-057fd28a4e3a41a05,subnet-026d2aad784271a82,subnet-034f33f3a6ffbacdf
+
 3. 
 4. Email can't be received in other then the following regions: https://docs.aws.amazon.com/ses/latest/DeveloperGuide/regions.html  
 Receieve email problematic region: https://forums.aws.amazon.com/thread.jspa?messageID=925600&tstart=0  
@@ -63,14 +69,22 @@ Amazon SES email receiving concepts: https://docs.aws.amazon.com/ses/latest/Deve
 **My section changes (additional to the README.md ones):**  
 **Instructions**  
 **Setup**  
-2. sam package --template-file template.yaml --output-template-file deploy.yaml --s3-bucket trapheus-s3
-3. sam deploy --template-file deploy.yaml --stack-name Trapheus-stack --region eu-central-1 --capabilities CAPABILITY_NAMED_IAM --parameter-overrides vpcId=vpc-0710d425a3d07c27a Subnets=subnet-0364fd18d49bfa473,subnet-0a3a20efe2820f95b,subnet-0df5695cf0f8bfad2 SenderEmail=deksa13jakim@yahoo.com RecipientEmail=deksa13jakim@yahoo.com  
+2. sam package --template-file template.yaml --output-template-file deploy.yaml --s3-bucket trapheuss3
+3. sam deploy --template-file deploy.yaml --stack-name Trapheus-stack --region eu-west-1 --capabilities CAPABILITY_NAMED_IAM --parameter-overrides vpcId=vpc-0e7aa330236a2b3ac Subnets=subnet-057fd28a4e3a41a05,subnet-026d2aad784271a82,subnet-034f33f3a6ffbacdf SenderEmail=deksa13jakim@yahoo.com RecipientEmail=deksa13jakim@yahoo.com  
+OLD (before trial to fix the connection problem): sam deploy --template-file deploy.yaml --stack-name Trapheus-stack --region eu-central-1 --capabilities CAPABILITY_NAMED_IAM --parameter-overrides vpcId=vpc-0710d425a3d07c27a Subnets=subnet-0364fd18d49bfa473,subnet-0a3a20efe2820f95b,subnet-0df5695cf0f8bfad2 SenderEmail=deksa13jakim@yahoo.com RecipientEmail=deksa13jakim@yahoo.com  
 Subnets are public in the default VPC but perhaps it is not going to complain. For more here: https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Subnets.html
+
     
 **Execution**  
 For creating a snapshot of my non-clustered database:    
 {
     "identifier": "database-1",
+    "task": "create_snapshot",
+    "isCluster": false
+}
+NEW:
+{
+    "identifier": "database-2",
     "task": "create_snapshot",
     "isCluster": false
 }
@@ -109,6 +123,10 @@ https://aws.amazon.com/premiumsupport/knowledge-center/lambda-rds-connection-tim
 - Creating an All trafic with own sec. group as source inbound rule. Remove it if it doesn't work.
     - Didn't work probably because for the RDS the default sec group of the Trapheus VPC was active.  
     - I am trying to make the RDS work on the my-sg sec group. Deleted the database and recreated it. This means the RDS needs to be created after the stack is created. Perhaps change the sec group without deleting the DB if possible.  
+- Creating a All trafic with Lambda sec. group as source inbound rule. 
+	- https://stackoverflow.com/questions/37030704/allow-aws-lambda-to-access-rds-database#:~:text=You%20can%20configure%20Lambda%20to,you%20need%20it%20to%20access.  
+- Permissions – AWSLambdaVPCAccessExecutionRole, the prerequisite for lambda accessing rds exists for the lambda function. https://docs.aws.amazon.com/lambda/latest/dg/services-rds-tutorial.html
+- 
     
 **TODO (after each work day, shutdown RDS)**
 - (DONE) run python tests from intellij
@@ -120,7 +138,11 @@ https://aws.amazon.com/premiumsupport/knowledge-center/lambda-rds-connection-tim
                 - for the communication between the local state machine/step function/lambdas and the RDS instance check the same url above.
             - if custom way fails, check out localstack
             - if localstack fails, check stackery https://docs.stackery.io/docs/workflow/local-invoke-rds/    
-- write a test for the use case of the contributor to the issue
+- (DONE - he wrote them) write a test for the use case of the contributor to the issue
 - write a new use case additional to the use case of the contributor to the issue
+	- Maybe the use case "You can copy a snapshot from an AWS Region where S3 export isn't supported to one where it is supported, then export the copy. The S3 bucket must be in the same AWS Region as the copy."? (check https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ExportSnapshot.html)  
     - I need to make the app work on AWS first.    
+		- Check above exceptions for the progress.
+			- HERE Try placing everything in the Ireland region as there you have all kinds of capabilities that are not available in Frankfurt region.
+				- If that doesn't work, check how to make Lambda access RDS by creating a simple one https://docs.aws.amazon.com/lambda/latest/dg/services-rds-tutorial.html and then apply missing parts to mine.
 - improve the documentation  

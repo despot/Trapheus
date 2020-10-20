@@ -17,9 +17,13 @@ def lambda_copy_snapshot_to_s3_export_supportable_region(event, context):
     result = {}
 
     try:
-        db_snapshot_copy_response = copy_db_snapshot(export_snapshot_supported_region_kms_key_id,
-                                                     export_snapshot_supported_region_rds, region, snapshot_arn,
-                                                     snapshot_id)
+        db_snapshot_copy_response = export_snapshot_supported_region_rds.copy_db_snapshot(
+            SourceDBSnapshotIdentifier=snapshot_arn,
+            TargetDBSnapshotIdentifier=snapshot_id,
+            KmsKeyId=export_snapshot_supported_region_kms_key_id,
+            CopyTags=True,
+            SourceRegion=region
+        )
         result['taskname'] = constants.COPY_SNAPSHOT
         result['identifier'] = instance_id
         result['status'] = db_snapshot_copy_response['DBSnapshot']['Status']
@@ -27,16 +31,3 @@ def lambda_copy_snapshot_to_s3_export_supportable_region(event, context):
         return result
     except Exception as error:
         raise Exception(error)
-
-
-def copy_db_snapshot(export_snapshot_supported_region_kms_key_id, export_snapshot_supported_region_rds, region,
-                     snapshot_arn, snapshot_id):
-    return export_snapshot_supported_region_rds.copy_db_snapshot(
-        SourceDBSnapshotIdentifier=snapshot_arn,
-        TargetDBSnapshotIdentifier=snapshot_id,
-        KmsKeyId=export_snapshot_supported_region_kms_key_id,
-        CopyTags=True,
-        SourceRegion=region
-    )
-
-
